@@ -1,0 +1,16 @@
+name: Prevent Direct Commits to Protected Branches
+on:
+  push:
+    branches:
+      - master
+      - dev
+
+jobs:
+  prevent-direct-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if the push is a direct commit
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
+        run: |
+          echo "Direct pushes to 'main' and 'dev' branches are restricted. Please create a pull request."
+          exit 1
