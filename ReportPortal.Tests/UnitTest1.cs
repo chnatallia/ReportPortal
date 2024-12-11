@@ -17,8 +17,7 @@ namespace ReportPortal.Tests
         //string apiKey = "mykey_PSuPAlX0Q8KDStLMq4jh_93E3tTHOnlDoUkMPKyAINAnkB8EP0MnOZ310YK30yX-";
 
         IConfiguration Configuration;
-
-        HttpClient client;
+        IApiClient client;
 
         public UnitTest1()
         {
@@ -26,9 +25,10 @@ namespace ReportPortal.Tests
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json")
                 .Build();
-            client = new HttpClient();
-            client.BaseAddress = new Uri(Configuration["baseUrl"]!);
-            client.DefaultRequestHeaders.Add("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzI2NDkwNDcsInVzZXJfbmFtZSI6InN1cGVyYWRtaW4iLCJhdXRob3JpdGllcyI6WyJST0xFX0FETUlOSVNUUkFUT1IiXSwianRpIjoiWEVtNnZyVkVPYVRIVF9KVHFDQ1NiTzR2VExZIiwiY2xpZW50X2lkIjoidWkiLCJzY29wZSI6WyJ1aSJdfQ.UH4R6mbTfpS6z4lqmRUdyxuJhOvR6Qy9NbHhge1gmx4");
+            //client = new RestSharpApiClient("http://172.30.128.1:8080/api/v1/");
+            client = new HttpClientAPI();
+            client.SetBaseUrl(Configuration["baseUrl"]!);
+            client.SetHeader("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzMzNTUxMTQsInVzZXJfbmFtZSI6InN1cGVyYWRtaW4iLCJhdXRob3JpdGllcyI6WyJST0xFX0FETUlOSVNUUkFUT1IiXSwianRpIjoiWFRpSE1RS0R0cXpBd2x3eXhheFBGcExUSzlZIiwiY2xpZW50X2lkIjoidWkiLCJzY29wZSI6WyJ1aSJdfQ.e-tt6lIlTSExoAKbligV2iYfWTi0cXLyOssa-Jafcjc");
             this.projectName = Configuration["projectName"]!;
             this.invalidProjectName = Configuration["invalidProjectName"]!;
             this.validLaunchId = Int32.Parse(Configuration.GetSection("validLaunch")["id"]!);
@@ -37,12 +37,11 @@ namespace ReportPortal.Tests
         }
 
         [Fact]
-        public async Task GetSpecifiedLaunchByUUIDPositive()
+        public void GetSpecifiedLaunchByUUIDPositive()
         {
-            HttpResponseMessage response = await client.GetAsync(projectName + "/launch/uuid/" + validLaunchUuid);
-            string json = await response.Content.ReadAsStringAsync();
-            Assert.True(response.IsSuccessStatusCode);
-            Launch result = JsonConvert.DeserializeObject<Launch>(json);
+            GetResponse response = client.Get(projectName + "/launch/uuid/" + validLaunchUuid);
+            Assert.True(response.IsSucceed);
+            Launch result = JsonConvert.DeserializeObject<Launch>(response.Json);
 
             //Get uuid not deserializign all response <- Newtonsoft.Json
 
@@ -50,15 +49,14 @@ namespace ReportPortal.Tests
         }
 
         [Fact]
-        public async Task GetSpecifiedLaunchByIdNotFound()
+        public void GetSpecifiedLaunchByIdNotFound()
         {
-            HttpResponseMessage response = await client.GetAsync(projectName + "/launch/" + invalidLaunchId);
-            string json = await response.Content.ReadAsStringAsync();
-            Assert.True(response.StatusCode == HttpStatusCode.NotFound);
+            GetResponse response = client.Get(projectName + "/launch/" + invalidLaunchId);
+            Assert.True(response.StatusCode == (int)HttpStatusCode.NotFound);
         }
 
         [Fact]
-        public async Task UpdateLaunchForSpecificProjectValidLaunchId()
+        public void UpdateLaunchForSpecificProjectValidLaunchId()
         {
 
             Payload payload = new Payload()
@@ -75,17 +73,16 @@ namespace ReportPortal.Tests
                 }
             };
             var json = JsonConvert.SerializeObject(payload);
-            HttpResponseMessage response = await client.PutAsync(
-            requestUri: projectName + "/launch/" + validLaunchId + "/update",
-            content: new StringContent(json, Encoding.UTF8,"application/json"));
-            string jsonResponse = await response.Content.ReadAsStringAsync();
-            Assert.True(response.StatusCode == HttpStatusCode.OK);
+            PutResponse response = client.Put(
+            projectName + "/launch/" + validLaunchId + "/update", json);
+            string jsonResponse =  response.Json;
+            Assert.True(response.StatusCode == (int)HttpStatusCode.OK);
             ApiResponse  result = JsonConvert.DeserializeObject<ApiResponse>(jsonResponse);
             Assert.Equal($"Launch with ID = '{validLaunchId}' successfully updated.", result.message);
         }
 
         [Fact]
-        public async Task UpdateLaunchForSpecificProjectInvalidProject()
+        public void UpdateLaunchForSpecificProjectInvalidProject()
         {
             var payload = new
             {
@@ -101,17 +98,16 @@ namespace ReportPortal.Tests
                 }
             };
             var json = JsonConvert.SerializeObject(payload);
-            HttpResponseMessage response = await client.PutAsync(
-            requestUri: invalidProjectName + "/launch/" + validLaunchId + "/update",
-            content: new StringContent(json, Encoding.UTF8, "application/json"));
-            string jsonResponse = await response.Content.ReadAsStringAsync();
-            Assert.True(response.StatusCode == HttpStatusCode.NotFound);
+            PutResponse response = client.Put(
+            invalidProjectName + "/launch/" + validLaunchId + "/update", json);
+            string jsonResponse = response.Json;
+            Assert.True(response.StatusCode == (int)HttpStatusCode.NotFound);
             ApiResponse result = JsonConvert.DeserializeObject<ApiResponse>(jsonResponse);
             Assert.Equal($"Project '{invalidProjectName}' not found. Did you use correct project name?", result.message);
 
         }
         [Fact]
-        public async Task UpdateLaunchForSpecificProjectInvalidLaunch()
+        public void UpdateLaunchForSpecificProjectInvalidLaunch()
         {
             var payload = new
             {
@@ -127,18 +123,17 @@ namespace ReportPortal.Tests
                 }
             };
             var json = JsonConvert.SerializeObject(payload);
-            HttpResponseMessage response = await client.PutAsync(
-            requestUri:  projectName + "/launch/" + invalidLaunchId + "/update",
-            content: new StringContent(json, Encoding.UTF8, "application/json"));
-            string jsonResponse = await response.Content.ReadAsStringAsync();
-            Assert.True(response.StatusCode == HttpStatusCode.NotFound);
+            PutResponse response = client.Put(
+            projectName + "/launch/" + invalidLaunchId + "/update",json);
+            string jsonResponse = response.Json;
+            Assert.True(response.StatusCode == (int)HttpStatusCode.NotFound);
             ApiResponse result = JsonConvert.DeserializeObject<ApiResponse>(jsonResponse);
             Assert.Equal($"Launch '{invalidLaunchId}' not found. Did you use correct Launch ID?", result.message);
 
         }
 
         [Fact]
-        public async Task StartLaunchAnalyzerOnDemandOk()
+        public void StartLaunchAnalyzerOnDemandOk()
         {
             var payload = new
             {
@@ -149,15 +144,15 @@ namespace ReportPortal.Tests
 
             };
             var json = JsonConvert.SerializeObject(payload);
-            HttpResponseMessage response = await client.PostAsync( projectName + "/launch/analyze", new StringContent(json,Encoding.UTF8, "application/json"));
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            Assert.True(response.StatusCode == HttpStatusCode.OK);
+            PostResponse response =  client.Post( projectName + "/launch/analyze", json);
+            var jsonResponse = response.Json;
+            Assert.True(response.StatusCode == (int)HttpStatusCode.OK);
             ApiResponse result = JsonConvert.DeserializeObject<ApiResponse>(jsonResponse);
             Assert.Equal($"autoAnalyzer analysis for launch with ID='{validLaunchId}' started.", result.message);
         }
 
         [Fact]
-        public async Task StartLaunchAnalyzerOnDemandForInvalidProject()
+        public void StartLaunchAnalyzerOnDemandForInvalidProject()
         {
             var payload = new
             {
@@ -168,15 +163,15 @@ namespace ReportPortal.Tests
 
             };
             var json = JsonConvert.SerializeObject(payload);
-            HttpResponseMessage response = await client.PostAsync( invalidProjectName + "/launch/analyze", new StringContent(json, Encoding.UTF8, "application/json"));
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            Assert.True(response.StatusCode == HttpStatusCode.NotFound);
+            PostResponse response = client.Post( invalidProjectName + "/launch/analyze", json);
+            var jsonResponse = response.Json;
+            Assert.True(response.StatusCode == (int)HttpStatusCode.NotFound);
             ApiResponse result = JsonConvert.DeserializeObject<ApiResponse>(jsonResponse);
             Assert.Equal($"Project '{invalidProjectName}' not found. Did you use correct project name?", result.message);
         }
 
         [Fact]
-        public async Task StartLaunchAnalyzerOnDemandForInvalidLaunch()
+        public void StartLaunchAnalyzerOnDemandForInvalidLaunch()
         {
             var payload = new
             {
@@ -186,21 +181,21 @@ namespace ReportPortal.Tests
                 analyzeItemsMode = new string[] { "AUTO_ANALYZED" }
 
             };
-            var json = JsonConvert.SerializeObject(payload);
-            HttpResponseMessage response = await client.PostAsync( projectName + "/launch/analyze", new StringContent(json, Encoding.UTF8, "application/json"));
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            Assert.True(response.StatusCode == HttpStatusCode.NotFound);
+            string json = JsonConvert.SerializeObject(payload);
+            PostResponse response = client.Post( projectName + "/launch/analyze", json);
+            var jsonResponse = response.Json;
+            Assert.True(response.StatusCode == (int)HttpStatusCode.NotFound);
             ApiResponse result = JsonConvert.DeserializeObject<ApiResponse>(jsonResponse);
             Assert.Equal($"Launch '{invalidLaunchId}' not found. Did you use correct Launch ID?", result.message);
         }
 
         [Fact]
-        public async Task DeleteLaunchNotValid()
+        public void DeleteLaunchNotValid()
         {
 
-            HttpResponseMessage response = await client.DeleteAsync(projectName + "/launch/"+invalidLaunchId);
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            Assert.True(response.StatusCode == HttpStatusCode.NotFound);
+            DeleteResponse response = client.Delete(projectName + "/launch/"+invalidLaunchId);
+            var jsonResponse = response.Json;
+            Assert.True(response.StatusCode == (int)HttpStatusCode.NotFound);
             ApiResponse result = JsonConvert.DeserializeObject<ApiResponse>(jsonResponse);
             Assert.Equal($"Launch '{invalidLaunchId}' not found. Did you use correct Launch ID?", result.message);
         }
